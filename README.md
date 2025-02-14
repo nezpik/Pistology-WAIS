@@ -2,6 +2,8 @@
 
 An intelligent, collaborative Warehouse AI System (WAIS) for document processing and warehouse management using multiple AI agents.
 
+![Pistology WAIS Interface](Pistology%20WMAS.png)
+
 ## Features
 
 - Multi-agent AI system with specialized agents:
