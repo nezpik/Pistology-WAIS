@@ -1,5 +1,5 @@
 streamlit>=1.31.0
-tensorflow>=2.13.0
+tensorflow-cpu>=2.13.0  # Using CPU version to reduce memory usage
 numpy>=1.24.3
 pandas>=2.0.3
 langchain>=0.1.0
@@ -13,10 +13,11 @@ python-magic-bin>=0.4.14  # for file type detection
 pdf2image>=1.16.3  # for PDF processing
 pytesseract>=0.3.10  # for OCR
 pillow>=10.2.0  # for image processing
+sympy>=1.12  # for mathematical operations and symbolic computation
 fastapi>=0.104.1
 uvicorn>=0.24.0
 pydantic>=2.0.0
 python-multipart>=0.0.6
-watchdog
+watchdog>=3.0.0
 pathlib>=1.0.1
 mimetypes>=0.1.0
