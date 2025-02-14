@@ -2,10 +2,12 @@ from typing import List, Dict, Any, Optional
 from agents.inventory_agent import InventoryAgent
 from agents.operations_agent import OperationsAgent
 from agents.supervisor_agent import SupervisorAgent
+from agents.math_agent import MathAgent
 from agents.document_processor import DocumentProcessor, ProcessingResult
 from pathlib import Path
 import json
 import logging
+import re
 from dataclasses import asdict, dataclass
 from enum import Enum
 import queue
@@ -16,6 +18,7 @@ class AgentRole(Enum):
     INVENTORY = "inventory"
     OPERATIONS = "operations"
     SUPERVISOR = "supervisor"
+    MATH = "math"
 
 @dataclass
 class AgentMessage:
@@ -36,12 +39,14 @@ class AgentOrchestrator:
         inventory_agent: InventoryAgent,
         operations_agent: OperationsAgent,
         supervisor_agent: SupervisorAgent,
+        math_agent: MathAgent,
         document_processor: DocumentProcessor = None
     ):
         """Initialize the agent orchestrator with all required agents"""
         self.inventory_agent = inventory_agent
         self.operations_agent = operations_agent
         self.supervisor_agent = supervisor_agent
+        self.math_agent = math_agent
         self.document_processor = document_processor or DocumentProcessor()
         
         # Setup logging
@@ -51,14 +56,16 @@ class AgentOrchestrator:
         self.message_queues = {
             AgentRole.INVENTORY: queue.Queue(),
             AgentRole.OPERATIONS: queue.Queue(),
-            AgentRole.SUPERVISOR: queue.Queue()
+            AgentRole.SUPERVISOR: queue.Queue(),
+            AgentRole.MATH: queue.Queue()
         }
         
         # Initialize knowledge base
         self.knowledge_base = {
             "documents": [],
             "insights": [],
-            "decisions": []
+            "decisions": [],
+            "calculations": []  # New section for mathematical results
         }
         
         # Initialize processing directory
@@ -116,6 +123,8 @@ class AgentOrchestrator:
                 response = self.inventory_agent.process(message.content)
             elif message.receiver == AgentRole.OPERATIONS:
                 response = self.operations_agent.process(message.content)
+            elif message.receiver == AgentRole.MATH:
+                response = self.math_agent.process(message.content, message.context)
                 
             # Send response back if needed
             if response and message.context.get("requires_response", False):
@@ -138,6 +147,37 @@ class AgentOrchestrator:
     def process_query(self, query: str, agent_type: Optional[str] = None) -> Dict[str, Any]:
         """Process a query using the appropriate agent with collaborative validation"""
         try:
+            # Detect if query requires mathematical reasoning
+            if self._requires_math_reasoning(query):
+                math_response = self.math_agent.process(query, {"task": "solve"})
+                
+                # Verify the mathematical solution
+                verification = self.math_agent.process(math_response, {
+                    "task": "verify",
+                    "original_problem": query
+                })
+                
+                # Store mathematical results
+                self.knowledge_base["calculations"].append({
+                    "query": query,
+                    "solution": math_response,
+                    "verification": verification,
+                    "timestamp": datetime.now().isoformat()
+                })
+                
+                # Get supervisor validation
+                validation = self.supervisor_agent.validate_decision({
+                    "problem": query,
+                    "solution": math_response,
+                    "verification": verification
+                })
+                
+                return {
+                    "response": math_response,
+                    "verification": verification,
+                    "validation": validation
+                }
+            
             # Default to inventory agent if no type specified
             if not agent_type:
                 agent_type = "inventory"
@@ -176,6 +216,21 @@ class AgentOrchestrator:
                 "error": str(e),
                 "agent_type": agent_type
             }
+
+    def _requires_math_reasoning(self, query: str) -> bool:
+        """Detect if a query requires mathematical reasoning"""
+        math_indicators = [
+            r'\d+[\+\-\*/\^][\d\+\-\*/\^()]*',  # Mathematical operations
+            r'calculate|compute|solve|equation|formula|algorithm',  # Mathematical keywords
+            r'optimize|efficiency|complexity|performance',  # Optimization keywords
+            r'proof|prove|theorem|lemma',  # Mathematical proofs
+            r'integral|derivative|sum|product',  # Calculus terms
+            r'matrix|vector|linear|algebra',  # Linear algebra terms
+            r'probability|statistics|distribution',  # Statistical terms
+            r'geometry|trigonometry|angle|distance'  # Geometric terms
+        ]
+        
+        return any(re.search(pattern, query, re.IGNORECASE) for pattern in math_indicators)
 
     def process_documents(self, file_paths: List[str]) -> List[ProcessingResult]:
         """Process documents with collaborative analysis"""
@@ -303,7 +358,8 @@ class AgentOrchestrator:
             agent_statuses = {
                 "inventory_agent": "Ready" if self.inventory_agent else "Not Initialized",
                 "operations_agent": "Ready" if self.operations_agent else "Not Initialized",
-                "supervisor_agent": "Ready" if self.supervisor_agent else "Not Initialized"
+                "supervisor_agent": "Ready" if self.supervisor_agent else "Not Initialized",
+                "math_agent": "Ready" if self.math_agent else "Not Initialized"
             }
             
             return {
@@ -321,3 +377,96 @@ class AgentOrchestrator:
                 "agents": {},
                 "error": str(e)
             }
+
+    def process_query_with_validation(self, query: str, context: Optional[Dict[str, Any]] = None) -> str:
+        """Process a user query through the appropriate agent"""
+        try:
+            # Initialize context if None
+            context = context or {}
+            
+            # Route the query to determine which agent should handle it
+            agent_type = self.supervisor_agent.route_query(query)
+            
+            # Process based on agent type
+            if agent_type == "inventory":
+                response = self.inventory_agent.process(query, context)
+            elif agent_type == "operations":
+                response = self.operations_agent.process(query, context)
+            elif agent_type == "math":
+                response = self._handle_math_query(query, context)
+            else:
+                response = self.inventory_agent.process(query, context)  # Default to inventory
+                
+            # Validate the response
+            validation_context = {
+                "query": query,
+                "agent_type": agent_type,
+                "context": context
+            }
+            
+            validated_response = self.supervisor_agent.validate_response(response, validation_context)
+            return validated_response
+            
+        except Exception as e:
+            self.logger.error(f"Error in query processing: {str(e)}")
+            return f"Error processing query: {str(e)}"
+
+    def _handle_math_query(self, query: str, context: Dict[str, Any]) -> str:
+        """Handle mathematical queries with validation"""
+        try:
+            # Get solution from math agent
+            solution = self.math_agent.process(query, context)
+            
+            # Prepare decision data for validation
+            decision_data = {
+                "problem": query,
+                "solution": solution,
+                "verification": self.math_agent.verify_solution(query, solution)
+            }
+            
+            # Get validation from supervisor
+            validation = self.supervisor_agent.validate_decision(decision_data)
+            
+            return f"""Solution: {solution}
+            
+Validation: {validation}"""
+            
+        except Exception as e:
+            self.logger.error(f"Error in math query handling: {str(e)}")
+            return f"Error processing mathematical query: {str(e)}"
+
+    def process_document_with_insights(self, document_path: str) -> str:
+        """Process a document and extract relevant information"""
+        try:
+            # Process the document
+            processing_result = self.document_processor.process_document(document_path)
+            
+            if not processing_result.success:
+                return f"Error processing document: {processing_result.error}"
+                
+            # Extract insights using supervisor
+            insights = self.supervisor_agent.extract_insights(processing_result.content)
+            
+            # Format insights
+            formatted_insights = "\n".join([
+                f"• {insight['content']}" for insight in insights
+            ])
+            
+            return f"""Document processed successfully.
+            
+Key Insights:
+{formatted_insights}"""
+            
+        except Exception as e:
+            self.logger.error(f"Error processing document: {str(e)}")
+            return f"Error processing document: {str(e)}"
+
+    def get_agent_status(self) -> Dict[str, str]:
+        """Get the status of all agents"""
+        return {
+            "inventory": self.inventory_agent.get_status(),
+            "operations": self.operations_agent.get_status(),
+            "supervisor": self.supervisor_agent.get_status(),
+            "math": self.math_agent.get_status(),
+            "document_processor": "Ready"
+        }
