@@ -1,0 +1,10 @@
+This is a test document for our document processor.
+It contains multiple lines of text to process.
+
+The document processor should:
+1. Handle this text file efficiently
+2. Extract its content correctly
+3. Provide accurate metadata
+4. Manage memory usage appropriately
+
+This test document will help us verify that our optimizations are working correctly.
