@@ -10,18 +10,24 @@ logger = logging.getLogger(__name__)
 # Load environment variables from .env file
 load_dotenv()
 
-# API Keys
-DEEPSEEK_API_KEY = os.getenv('DEEPSEEK_API_KEY')
-GEMINI_API_KEY_OPERATIONS = os.getenv('GEMINI_API_KEY_OPERATIONS')
-GEMINI_API_KEY_SUPERVISOR = os.getenv('GEMINI_API_KEY_SUPERVISOR')
-GEMINI_API_KEY_INVENTORY = os.getenv('GEMINI_API_KEY_INVENTORY')
+def get_required_env(key: str) -> str:
+    """Get a required environment variable or raise an error"""
+    value = os.getenv(key)
+    if not value:
+        error_msg = f"Missing required environment variable: {key}"
+        logger.error(error_msg)
+        raise ValueError(error_msg)
+    return value
 
-# Check for required API keys
-if not all([DEEPSEEK_API_KEY, GEMINI_API_KEY_OPERATIONS, 
-           GEMINI_API_KEY_SUPERVISOR, GEMINI_API_KEY_INVENTORY]):
-    error_msg = "Missing required API keys. Please check your .env file."
-    logger.error(error_msg)
-    raise ValueError(error_msg)
+# API Keys - loaded from environment variables
+try:
+    DEEPSEEK_API_KEY = get_required_env('DEEPSEEK_API_KEY')
+    GEMINI_API_KEY_SUPERVISOR = get_required_env('GEMINI_API_KEY_SUPERVISOR')
+    GEMINI_API_KEY_INVENTORY = get_required_env('GEMINI_API_KEY_INVENTORY')
+    GEMINI_API_KEY_OPERATIONS = get_required_env('GEMINI_API_KEY_OPERATIONS')
+except ValueError as e:
+    logger.error("Failed to load required API keys")
+    raise
 
 # Model configurations
 DEEPSEEK_MODEL = "deepseek-coder-33b-instruct"
