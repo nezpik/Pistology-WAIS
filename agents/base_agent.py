@@ -104,3 +104,20 @@ class BaseAgent(ABC):
         except Exception as e:
             self.logger.error(f"Error processing task {task}: {str(e)}")
             return None
+
+    def process_query(self, query: str, context: Optional[Dict[str, Any]] = None) -> str:
+        """Process a query with optional context - wrapper around process method"""
+        try:
+            # Add query-specific context
+            query_context = context or {}
+            query_context.update({
+                "task": "process_query",
+                "query_text": query
+            })
+            
+            # Process the query using the base process method
+            return self.process(query, query_context)
+            
+        except Exception as e:
+            self.logger.error(f"Error processing query in {self.name}: {str(e)}")
+            return f"Error processing query: {str(e)}"

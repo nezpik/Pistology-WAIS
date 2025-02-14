@@ -14,13 +14,31 @@ class MathAgent(BaseAgent):
         self.symbolic_vars = {}
         
     def process(self, input_data: str, context: Dict[str, Any] = None) -> str:
-        """Process mathematical queries and problems"""
+        """Process mathematical calculations and optimization tasks"""
         try:
             context = context or {}
             task = context.get("task", "solve")
             
             if task == "solve":
                 return self._solve_problem(input_data, context)
+            elif task == "process_query":
+                # Handle math-specific query
+                prompt = f"""As a Warehouse Math Analysis Agent, provide a detailed response to this query:
+
+Query: {input_data}
+
+Consider:
+1. Numerical calculations
+2. Statistical analysis
+3. Optimization problems
+4. Performance metrics
+5. Efficiency calculations
+6. Resource utilization
+
+Provide specific calculations and mathematical insights."""
+                
+                response = self.model.generate_content(prompt)
+                return response.text
             elif task == "verify":
                 solution = context.get("solution", "")
                 return self._verify_solution(solution, {"original_problem": input_data})
@@ -44,6 +62,28 @@ class MathAgent(BaseAgent):
     def _solve_problem(self, problem: str, context: Dict[str, Any]) -> str:
         """Solve a mathematical problem using step-by-step reasoning"""
         try:
+            self.logger.info(f"Math Agent received problem: {problem}")
+            
+            # Check for warehouse-specific calculations
+            if any(term in problem.lower() for term in ['takt', 'lead time', 'cycle time']):
+                return self._calculate_warehouse_metrics(problem)
+            
+            # Extract numbers and operators from the query
+            expression = ''.join(c for c in problem if c.isdigit() or c in '+-*/.() ')
+            expression = expression.strip()
+            self.logger.info(f"Extracted expression: {expression}")
+            
+            # Check for basic arithmetic
+            if expression and all(c in "0123456789+-*/(). " for c in expression):
+                self.logger.info("Detected basic arithmetic expression")
+                try:
+                    result = eval(expression.replace("^", "**"))
+                    self.logger.info(f"Arithmetic result: {result}")
+                    return f"The result of {expression} is {result}"
+                except Exception as e:
+                    self.logger.error(f"Error evaluating arithmetic: {str(e)}")
+                    pass  # Fall back to SymPy if eval fails
+            
             # Check for inventory optimization
             if "inventory" in problem.lower() and "demand" in problem.lower():
                 return self._calculate_inventory_levels(problem)
@@ -400,6 +440,55 @@ class MathAgent(BaseAgent):
                     
         except Exception as e:
             return f"Error in verification: {str(e)}"
+            
+    def _calculate_warehouse_metrics(self, problem: str) -> str:
+        """Calculate warehouse-specific metrics like takt time and lead time"""
+        try:
+            # Extract numbers using regex
+            numbers = [float(n) for n in re.findall(r'-?\d+\.?\d*', problem)]
+            
+            if 'takt' in problem.lower():
+                if len(numbers) >= 2:
+                    available_time = numbers[0]  # Usually in minutes or hours
+                    customer_demand = numbers[1]  # Units demanded
+                    takt_time = available_time / customer_demand
+                    return f"""
+Takt Time Calculation:
+- Available Production Time: {available_time} minutes
+- Customer Demand: {customer_demand} units
+- Takt Time = {takt_time:.2f} minutes per unit
+
+This means you need to complete one unit every {takt_time:.2f} minutes to meet customer demand.
+"""
+                else:
+                    return "Please provide both available production time and customer demand for takt time calculation."
+            
+            elif 'lead time' in problem.lower():
+                if len(numbers) >= 3:
+                    processing_time = numbers[0]
+                    queue_time = numbers[1]
+                    transport_time = numbers[2]
+                    total_lead_time = processing_time + queue_time + transport_time
+                    return f"""
+Lead Time Calculation:
+- Processing Time: {processing_time} minutes
+- Queue Time: {queue_time} minutes
+- Transport Time: {transport_time} minutes
+- Total Lead Time = {total_lead_time} minutes
+
+Breakdown:
+- Processing: {(processing_time/total_lead_time)*100:.1f}%
+- Queue: {(queue_time/total_lead_time)*100:.1f}%
+- Transport: {(transport_time/total_lead_time)*100:.1f}%
+"""
+                else:
+                    return "Please provide processing time, queue time, and transport time for lead time calculation."
+            
+            return "Please specify if you want to calculate takt time or lead time, along with the required values."
+            
+        except Exception as e:
+            self.logger.error(f"Error calculating warehouse metrics: {str(e)}")
+            return f"Error in warehouse calculations: {str(e)}"
             
     def get_status(self) -> str:
         """Get the current status of the agent"""

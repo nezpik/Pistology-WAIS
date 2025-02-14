@@ -1,6 +1,6 @@
 import requests
 from .base_agent import BaseAgent
-from config import DEEPSEEK_API_KEY, INVENTORY_MODEL
+from config import DEEPSEEK_API_KEY, DEEPSEEK_MODEL
 from typing import Dict, Any, List
 import logging
 
@@ -8,7 +8,7 @@ class InventoryAgent(BaseAgent):
     def __init__(self):
         super().__init__("Inventory")
         self.api_key = DEEPSEEK_API_KEY
-        self.model = INVENTORY_MODEL
+        self.model = DEEPSEEK_MODEL
         self.api_url = "https://api.deepseek.com/v1/chat/completions"
         self.headers = {
             "Authorization": f"Bearer {self.api_key}",
@@ -38,14 +38,30 @@ class InventoryAgent(BaseAgent):
             raise
         
     def process(self, input_data: str, context: Dict[str, Any] = None) -> str:
-        """Process inventory-related queries"""
+        """Process inventory-related queries and tasks"""
         try:
             context = context or {}
-            task = context.get("task", "process_query")
+            task = context.get("task", "general")
             
             if task == "extract_insights":
-                insights = self.extract_insights(input_data)
-                return f"Extracted {len(insights)} inventory insights"
+                return self._extract_inventory_insights(input_data)
+            elif task == "process_query":
+                # Handle inventory-specific query
+                prompt = f"""As an Inventory Management Agent, provide a detailed response to this query:
+
+Query: {input_data}
+
+Consider:
+1. Current stock levels and trends
+2. Inventory optimization
+3. Storage efficiency
+4. Stock movement patterns
+5. Reorder points and safety stock
+
+Provide specific, actionable insights related to inventory management."""
+                
+                response = self.model.generate_content(prompt)
+                return response.text
             else:
                 return self._process_inventory_query(input_data, context)
                 

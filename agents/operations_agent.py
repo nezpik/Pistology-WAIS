@@ -1,26 +1,43 @@
 import google.generativeai as genai
 from .base_agent import BaseAgent
-from config import GEMINI_OPERATIONS_KEY
+from config import GEMINI_API_KEY_OPERATIONS, GEMINI_MODEL
 from typing import Dict, Any, List
 import logging
 
 class OperationsAgent(BaseAgent):
     def __init__(self):
         super().__init__("Operations")
-        self.api_key = GEMINI_OPERATIONS_KEY
+        self.api_key = GEMINI_API_KEY_OPERATIONS
         genai.configure(api_key=self.api_key)
-        self.model = genai.GenerativeModel('gemini-pro')
+        self.model = genai.GenerativeModel(GEMINI_MODEL)
         self.logger = logging.getLogger(__name__)
         
     def process(self, input_data: str, context: Dict[str, Any] = None) -> str:
-        """Process operations-related queries"""
+        """Process operations-related queries and tasks"""
         try:
             context = context or {}
-            task = context.get("task", "process_query")
+            task = context.get("task", "general")
             
             if task == "extract_insights":
-                insights = self.extract_insights(input_data)
-                return f"Extracted {len(insights)} operational insights"
+                return self._extract_operations_insights(input_data)
+            elif task == "process_query":
+                # Handle operations-specific query
+                prompt = f"""As a Warehouse Operations Agent, provide a detailed response to this query:
+
+Query: {input_data}
+
+Consider:
+1. Workflow optimization
+2. Resource allocation
+3. Process efficiency
+4. Operational bottlenecks
+5. Performance metrics
+6. Quality control
+
+Provide specific, actionable recommendations for operational improvement."""
+                
+                response = self.model.generate_content(prompt)
+                return response.text
             else:
                 return self._process_operations_query(input_data, context)
                 
