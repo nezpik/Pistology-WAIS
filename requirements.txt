@@ -3,6 +3,9 @@ streamlit>=1.31.0
 fastapi>=0.104.1
 uvicorn>=0.24.0
 
+# Visualization
+plotly>=5.18.0  # Interactive charts for Pareto, ABC, Six Sigma visualizations
+
 # OpenAI SDK - Modern Agentic Workflows
 openai>=1.54.0  # Latest OpenAI SDK with Assistants API, streaming, function calling
 pydantic>=2.0.0  # For structured outputs and data validation
