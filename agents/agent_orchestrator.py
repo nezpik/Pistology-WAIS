@@ -10,6 +10,8 @@ from agents.inventory_agent import InventoryAgent
 from agents.operations_agent import OperationsAgent
 from agents.supervisor_agent import SupervisorAgent
 from agents.math_agent import MathAgent
+from agents.quality_agent import QualityAgent
+from agents.document_processor import DocumentProcessor
 from datetime import datetime
 import logging
 import json
@@ -30,11 +32,16 @@ class AgentOrchestrator:
     - Parallel agent execution
     - Streaming support
     - Context management
+    - Document processing with Docling
+    - Lean Six Sigma and Pareto analysis
     """
 
     def __init__(self):
         """Initialize orchestrator with all agents"""
         self.logger = logging.getLogger(__name__)
+
+        # Initialize document processor
+        self.document_processor = DocumentProcessor()
 
         # Initialize all agents
         self.agents = self._initialize_agents()
@@ -47,7 +54,7 @@ class AgentOrchestrator:
             "calculations": []
         }
 
-        self.logger.info("Agent Orchestrator initialized with OpenAI-powered agents")
+        self.logger.info("Agent Orchestrator initialized with OpenAI-powered agents + Document Processor")
 
     def _initialize_agents(self) -> Dict[str, BaseAgent]:
         """Initialize all specialized agents"""
@@ -90,7 +97,16 @@ class AgentOrchestrator:
             )
             agents["math"] = MathAgent(math_config, OPENAI_API_KEY)
 
-            self.logger.info(f"Initialized {len(agents)} agents successfully")
+            # Quality Agent (Lean Six Sigma + Pareto)
+            quality_config = AgentConfig(
+                name="quality",
+                model=AGENT_MODELS.get("quality", "gpt-4o"),
+                temperature=AGENT_TEMPERATURES.get("quality", 0.5),
+                max_tokens=MAX_TOKENS
+            )
+            agents["quality"] = QualityAgent(quality_config, OPENAI_API_KEY)
+
+            self.logger.info(f"Initialized {len(agents)} agents successfully (including Quality/Six Sigma agent)")
 
         except Exception as e:
             self.logger.error(f"Error initializing agents: {str(e)}")
@@ -341,3 +357,92 @@ class AgentOrchestrator:
     def get_agent(self, agent_name: str) -> Optional[BaseAgent]:
         """Get a specific agent by name"""
         return self.agents.get(agent_name)
+
+    # Document Processing Methods
+
+    def process_documents(self, file_paths: List[str]) -> Dict[str, Any]:
+        """
+        Process documents and add to system context.
+
+        Args:
+            file_paths: List of file paths to process
+
+        Returns:
+            Dictionary with processing results and statistics
+        """
+        self.logger.info(f"Processing {len(file_paths)} documents...")
+
+        results = self.document_processor.process_multiple_files(file_paths)
+
+        # Add document context to knowledge base
+        doc_context = self.document_processor.get_combined_context(max_chars=50000)
+        if doc_context:
+            self.knowledge_base["document_context"] = doc_context
+
+        successful = sum(1 for doc in results if doc.success)
+        failed = len(results) - successful
+
+        return {
+            "processed": len(results),
+            "successful": successful,
+            "failed": failed,
+            "documents": [
+                {
+                    "filename": doc.file_name,
+                    "success": doc.success,
+                    "error": doc.error,
+                    "processing_time": doc.processing_time
+                }
+                for doc in results
+            ],
+            "context_available": len(doc_context) > 0,
+            "statistics": self.document_processor.get_statistics()
+        }
+
+    def process_query_with_documents(
+        self,
+        query: str,
+        include_document_context: bool = True
+    ) -> AgentResponse:
+        """
+        Process query with document context included.
+
+        Args:
+            query: User query
+            include_document_context: Whether to include processed documents in context
+
+        Returns:
+            AgentResponse with document-aware answer
+        """
+        context = {}
+
+        if include_document_context:
+            doc_context = self.document_processor.get_combined_context(max_chars=10000)
+            if doc_context:
+                context["document_context"] = doc_context
+                self.logger.info("Including document context in query")
+
+        return self.process_query(query, context)
+
+    def search_documents(self, query: str) -> List[Dict[str, Any]]:
+        """
+        Search processed documents for query.
+
+        Args:
+            query: Search query
+
+        Returns:
+            List of matching documents with excerpts
+        """
+        return self.document_processor.search_documents(query)
+
+    def get_document_statistics(self) -> Dict[str, Any]:
+        """Get document processing statistics"""
+        return self.document_processor.get_statistics()
+
+    def clear_document_context(self):
+        """Clear all processed documents from context"""
+        self.document_processor.clear_context()
+        if "document_context" in self.knowledge_base:
+            del self.knowledge_base["document_context"]
+        self.logger.info("Document context cleared")

@@ -167,6 +167,55 @@ Use the provided functions to perform calculations. Always provide clear, action
                         "required": ["historical_demand"]
                     }
                 }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "abc_classification",
+                    "description": "Classify inventory items using ABC analysis (Pareto principle). A=high value, B=medium value, C=low value",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "items": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "sku": {"type": "string"},
+                                        "annual_value": {"type": "number"}
+                                    }
+                                },
+                                "description": "Array of SKUs with annual dollar values"
+                            }
+                        },
+                        "required": ["items"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "pareto_analysis_inventory",
+                    "description": "Perform Pareto analysis (80/20 rule) on inventory to identify vital few items",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "items": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "sku": {"type": "string"},
+                                        "metric_value": {"type": "number"}
+                                    }
+                                },
+                                "description": "Items with metric (sales, turns, value, etc.)"
+                            },
+                            "metric_name": {"type": "string", "description": "Name of the metric being analyzed"}
+                        },
+                        "required": ["items"]
+                    }
+                }
             }
         ]
 
@@ -187,6 +236,12 @@ Use the provided functions to perform calculations. Always provide clear, action
 
         elif function_name == "forecast_demand":
             return self._forecast_demand(**arguments)
+
+        elif function_name == "abc_classification":
+            return self._abc_classification(**arguments)
+
+        elif function_name == "pareto_analysis_inventory":
+            return self._pareto_analysis_inventory(**arguments)
 
         else:
             return {"error": f"Unknown function: {function_name}"}
@@ -325,5 +380,148 @@ Use the provided functions to perform calculations. Always provide clear, action
                 "recent_average": round(recent_avg, 2),
                 "trend": round(trend, 2)
             }
+        except Exception as e:
+            return {"error": str(e)}
+
+    def _abc_classification(self, items: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """
+        ABC Classification (Pareto Principle for Inventory).
+
+        A items: Top 20% by value (typically 70-80% of total value)
+        B items: Next 30% by value (typically 15-20% of total value)
+        C items: Bottom 50% by value (typically 5-10% of total value)
+        """
+        try:
+            if not items:
+                return {"error": "No items provided"}
+
+            # Sort by annual value descending
+            sorted_items = sorted(items, key=lambda x: x["annual_value"], reverse=True)
+
+            # Calculate total value and cumulative percentages
+            total_value = sum(item["annual_value"] for item in sorted_items)
+            cumulative = 0
+            results = []
+
+            for item in sorted_items:
+                value = item["annual_value"]
+                percent = (value / total_value) * 100
+                cumulative += percent
+
+                # Classify based on cumulative percentage
+                if cumulative <= 80:
+                    category = "A"
+                    priority = "High"
+                    control = "Tight inventory controls, frequent monitoring, accurate forecasting"
+                elif cumulative <= 95:
+                    category = "B"
+                    priority = "Medium"
+                    control = "Moderate controls, periodic review, standard forecasting"
+                else:
+                    category = "C"
+                    priority = "Low"
+                    control = "Basic controls, minimal monitoring, simple reorder systems"
+
+                results.append({
+                    "sku": item["sku"],
+                    "annual_value": round(value, 2),
+                    "percentage_of_total": round(percent, 2),
+                    "cumulative_percentage": round(cumulative, 2),
+                    "category": category,
+                    "priority": priority,
+                    "recommended_control": control
+                })
+
+            # Summarize by category
+            a_items = [r for r in results if r["category"] == "A"]
+            b_items = [r for r in results if r["category"] == "B"]
+            c_items = [r for r in results if r["category"] == "C"]
+
+            return {
+                "classification": results,
+                "summary": {
+                    "A_items": {
+                        "count": len(a_items),
+                        "percentage_of_items": round(len(a_items) / len(results) * 100, 1),
+                        "value_contribution": round(sum(i["percentage_of_total"] for i in a_items), 1),
+                        "management": "Tight controls - Daily/weekly monitoring, accurate forecasts, safety stock"
+                    },
+                    "B_items": {
+                        "count": len(b_items),
+                        "percentage_of_items": round(len(b_items) / len(results) * 100, 1),
+                        "value_contribution": round(sum(i["percentage_of_total"] for i in b_items), 1),
+                        "management": "Moderate controls - Monthly monitoring, standard forecasts"
+                    },
+                    "C_items": {
+                        "count": len(c_items),
+                        "percentage_of_items": round(len(c_items) / len(results) * 100, 1),
+                        "value_contribution": round(sum(i["percentage_of_total"] for i in c_items), 1),
+                        "management": "Basic controls - Quarterly review, simple reorder points"
+                    }
+                },
+                "recommendations": {
+                    "A_items": "Focus resources here - 20% of SKUs generating 80% of value",
+                    "B_items": "Maintain standard procedures - Moderate attention",
+                    "C_items": "Simplify management - Consider bulk orders or vendor-managed inventory"
+                }
+            }
+
+        except Exception as e:
+            return {"error": str(e)}
+
+    def _pareto_analysis_inventory(self, items: List[Dict[str, Any]], metric_name: str = "value") -> Dict[str, Any]:
+        """
+        Pareto Analysis (80/20 Rule) for inventory.
+
+        Identifies the vital few SKUs that drive the metric (sales, turns, etc.).
+        """
+        try:
+            if not items:
+                return {"error": "No items provided"}
+
+            # Sort by metric value descending
+            sorted_items = sorted(items, key=lambda x: x["metric_value"], reverse=True)
+
+            # Calculate cumulative percentages
+            total = sum(item["metric_value"] for item in sorted_items)
+            cumulative = 0
+            results = []
+
+            for item in sorted_items:
+                value = item["metric_value"]
+                percent = (value / total) * 100
+                cumulative += percent
+
+                results.append({
+                    "sku": item["sku"],
+                    "metric_value": round(value, 2),
+                    "percentage": round(percent, 2),
+                    "cumulative_percentage": round(cumulative, 2),
+                    "is_vital_few": cumulative <= 80,
+                    "rank": len(results) + 1
+                })
+
+            # Split into vital few and trivial many
+            vital_few = [r for r in results if r["is_vital_few"]]
+            trivial_many = [r for r in results if not r["is_vital_few"]]
+
+            return {
+                "metric": metric_name,
+                "analysis": results,
+                "vital_few": vital_few,
+                "trivial_many": trivial_many,
+                "summary": {
+                    "total_items": len(results),
+                    "vital_few_count": len(vital_few),
+                    "vital_few_percentage": round((len(vital_few) / len(results)) * 100, 1),
+                    "vital_few_contribution": round(sum(v["percentage"] for v in vital_few), 1),
+                    "trivial_many_count": len(trivial_many),
+                    "trivial_many_percentage": round((len(trivial_many) / len(results)) * 100, 1),
+                    "trivial_many_contribution": round(sum(t["percentage"] for t in trivial_many), 1)
+                },
+                "pareto_principle": f"{len(vital_few)} SKUs ({round((len(vital_few) / len(results)) * 100, 1)}%) generate {round(sum(v['percentage'] for v in vital_few), 1)}% of {metric_name}",
+                "recommendation": f"Focus inventory management resources on the top {len(vital_few)} SKUs which drive the majority of {metric_name}"
+            }
+
         except Exception as e:
             return {"error": str(e)}
