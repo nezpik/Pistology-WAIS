@@ -34,11 +34,14 @@ def get_optional_env(key: str, default: str = "") -> str:
 
 
 # OpenAI API Configuration
+# Made optional for Streamlit UI - can be configured at runtime
 try:
-    OPENAI_API_KEY = get_required_env('OPENAI_API_KEY')
-except ValueError as e:
-    logger.error("Failed to load required OpenAI API key")
-    raise
+    OPENAI_API_KEY = get_optional_env('OPENAI_API_KEY', '')
+    if not OPENAI_API_KEY:
+        logger.warning("No OPENAI_API_KEY found in environment. Configure via UI or set in .env file.")
+except Exception as e:
+    logger.warning(f"Could not load OpenAI API key from environment: {e}")
+    OPENAI_API_KEY = ""
 
 
 # Model configurations for different agents
