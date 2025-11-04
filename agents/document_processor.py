@@ -23,8 +23,19 @@ except ImportError:
     logging.warning("Docling not available. Using fallback processors.")
 
 # Fallback imports
-from langchain_community.document_loaders import TextLoader, UnstructuredFileLoader
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+try:
+    from langchain_community.document_loaders import TextLoader
+except ImportError:
+    TextLoader = None
+
+try:
+    from langchain_text_splitters import RecursiveCharacterTextSplitter
+except ImportError:
+    try:
+        from langchain.text_splitter import RecursiveCharacterTextSplitter
+    except ImportError:
+        RecursiveCharacterTextSplitter = None
+
 from dataclasses import dataclass
 from pydantic import BaseModel, Field
 
