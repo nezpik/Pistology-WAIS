@@ -1,26 +1,40 @@
+# Core Web Frameworks
 streamlit>=1.31.0
-tensorflow>=2.15.0  # Using CPU version to reduce memory usage
+fastapi>=0.104.1
+uvicorn>=0.24.0
+
+# OpenAI SDK - Modern Agentic Workflows
+openai>=1.54.0  # Latest OpenAI SDK with Assistants API, streaming, function calling
+pydantic>=2.0.0  # For structured outputs and data validation
+
+# Data Processing
 numpy>=1.22.0
 pandas>=1.5.0
+python-dotenv>=1.0.0
+
+# Document Processing
 langchain>=0.1.0
 langchain-community>=0.0.13
-python-dotenv>=1.0.0
-google-generativeai>=0.3.1
-requests>=2.31.0
-psutil>=5.9.8
+langchain-openai>=0.2.0  # OpenAI integration for LangChain
 unstructured>=0.11.0
 python-magic>=0.4.27  # for file type detection
 pdf2image>=1.16.3  # for PDF processing
 pytesseract>=0.3.10  # for OCR
 Pillow>=10.2.0  # for image processing
+
+# Mathematical Operations
 sympy>=1.12  # for mathematical operations and symbolic computation
-fastapi>=0.104.1
-uvicorn>=0.24.0
-pydantic>=2.0.0
+scipy>=1.11.0  # for scientific computing
+
+# System Monitoring
+psutil>=5.9.8
+
+# Utilities
 python-multipart>=0.0.6
 watchdog>=3.0.0
-pathlib>=1.0.1
-protobuf>=3.20.0,<5.0.0
 typing-inspect>=0.9.0
 typing_extensions>=4.8.0
 aiohttp>=3.9.1
+
+# Optional: Keep TensorFlow for any ML needs (can be removed if not needed)
+# tensorflow>=2.15.0
